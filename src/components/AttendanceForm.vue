@@ -1,5 +1,8 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue';
+import AlertMessage from './AlertMessage.vue';
+import FormField from './FormField.vue';
+import ComponentCheckbox from './Checkbox.vue';
 
 // Form data refs
 const date = ref('')
@@ -17,6 +20,8 @@ const yearsection = ref('')
 const number = ref('')
 const components = ref([])
 const remarks = ref('')
+const sections = ref([])
+const selectedSection = ref('')
 
 // Form state
 const isSubmitting = ref(false)
@@ -35,8 +40,35 @@ const updateDateTime = () => {
   })
 }
 
+// Fetch sections from the backend
+const fetchSections = async () => {
+  try {
+    const response = await fetch('http://localhost:8000/api/sections')
+    if (!response.ok) throw new Error('Failed to fetch sections')
+    sections.value = await response.json()
+  } catch (error) {
+    console.error('Error fetching sections:', error)
+  }
+}
+
+// Watch for changes in selectedSection to update building and classroom
+watch(selectedSection, async (newSection) => {
+  if (newSection) {
+    try {
+      const response = await fetch(`http://localhost:8000/api/sections/${newSection}`)
+      if (!response.ok) throw new Error('Failed to fetch building and classroom')
+      const data = await response.json()
+      building.value = data.building
+      classroom.value = data.classroom
+    } catch (error) {
+      console.error('Error fetching building and classroom:', error)
+    }
+  }
+})
+
 // Initialize date and time on component mount
 onMounted(() => {
+  fetchSections()
   updateDateTime()
   // Update time every minute
   setInterval(updateDateTime, 60000)
@@ -63,8 +95,8 @@ const handleSubmit = async () => {
 
     // Check for empty required fields
     const emptyFields = Object.entries(requiredFields)
-        .filter(([_, value]) => !value.trim())
-        .map(([key]) => key)
+      .filter(([_, value]) => !value.trim())
+      .map(([key]) => key)
 
     if (emptyFields.length > 0) {
       throw new Error(`Please fill in all required fields: ${emptyFields.join(', ')}`)
@@ -72,9 +104,6 @@ const handleSubmit = async () => {
 
     // Create form data object
     const formData = {
-      date: date.value,
-      day: day.value,
-      time: time.value,
       subject: subject.value,
       professorname: professorname.value,
       building: building.value,
@@ -89,7 +118,6 @@ const handleSubmit = async () => {
       remarks: remarks.value
     }
 
-    // Make POST request
     const response = await fetch('https://qcu-rest-api-attendance.vercel.app/api/create', {
       method: 'POST',
       headers: {
@@ -111,19 +139,8 @@ const handleSubmit = async () => {
     console.log('Success:', data)
     submitSuccess.value = true
 
-    // Reset form after successful submission
-    subject.value = ''
-    professorname.value = ''
-    building.value = ''
-    classroom.value = ''
-    terminalno.value = ''
-    name.value = ''
-    email.value = ''
-    studentnumber.value = ''
-    yearsection.value = ''
-    number.value = ''
-    components.value = []
-    remarks.value = ''
+    // Reset form
+    resetForm()
 
   } catch (error) {
     console.error('Error:', error)
@@ -132,121 +149,67 @@ const handleSubmit = async () => {
     isSubmitting.value = false
   }
 }
+
+const resetForm = () => {
+  subject.value = ''
+  professorname.value = ''
+  building.value = ''
+  classroom.value = ''
+  terminalno.value = ''
+  name.value = ''
+  email.value = ''
+  studentnumber.value = ''
+  yearsection.value = ''
+  number.value = ''
+  components.value = []
+  remarks.value = ''
+}
 </script>
 
 <template>
   <div class="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
-    <div class="mx-auto max-w-4xl bg-white rounded-lg shadow-md p-6">
+    <div class="mx-auto max-w-4xl bg-white rounded-lg shadow-md p-4 md:p-6">
       <h1 class="text-2xl md:text-3xl font-bold text-gray-800 mb-6 text-center">
         Utilization Monitoring Form
       </h1>
 
-      <!-- Messages -->
-      <div v-if="submitSuccess" class="mb-4 p-4 bg-green-100 text-green-700 rounded-md">
-        Form submitted successfully!
-      </div>
+      <AlertMessage v-if="submitSuccess" type="success" message="Form submitted successfully!" />
 
-      <div v-if="submitError" class="mb-4 p-4 bg-red-100 text-red-700 rounded-md">
-        {{ submitError }}
-      </div>
+      <AlertMessage v-if="submitError" type="error" :message="submitError" />
 
-      <!-- Form content remains the same as in your original template -->
       <form @submit.prevent="handleSubmit" class="space-y-6">
-        <!-- Rest of the form template remains the same -->
         <!-- First Section -->
-        <div class="space-y-4">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="space-y-4">
-              <div class="space-y-2">
-                <label for="date" class="block text-sm font-medium text-gray-700">Date:</label>
-                <input type="date" v-model="date" required readonly
-                       class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
-              </div>
-
-              <div class="space-y-2">
-                <label for="day" class="block text-sm font-medium text-gray-700">Day:</label>
-                <input type="text" v-model="day" required readonly
-                       class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
-              </div>
-
-              <div class="space-y-2">
-                <label for="time" class="block text-sm font-medium text-gray-700">Time:</label>
-                <input type="time" v-model="time" required readonly
-                       class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
-              </div>
-
-              <div class="space-y-2">
-                <label for="subject" class="block text-sm font-medium text-gray-700">Subject/Code:</label>
-                <input type="text" v-model="subject" required
-                       class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
-              </div>
-            </div>
-
-            <div class="space-y-4">
-              <div class="space-y-2">
-                <label for="professorname" class="block text-sm font-medium text-gray-700">Name of Faculty:</label>
-                <input type="text" v-model="professorname" required
-                       class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
-              </div>
-
-              <div class="space-y-2">
-                <label for="building" class="block text-sm font-medium text-gray-700">Building:</label>
-                <input type="text" v-model="building" required
-                       class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
-              </div>
-
-              <div class="space-y-2">
-                <label for="classroom" class="block text-sm font-medium text-gray-700">Room:</label>
-                <input type="text" v-model="classroom" required
-                       class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
-              </div>
-            </div>
-          </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField label="Name of Faculty" v-model="professorname" required />
+          <FormField label="Subject/Code" v-model="subject" required />
         </div>
 
         <hr class="border-gray-200" />
 
         <!-- Second Section -->
-        <div class="space-y-4">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="space-y-4">
-              <div class="space-y-2">
-                <label for="terminalno" class="block text-sm font-medium text-gray-700">Terminal No.:</label>
-                <input type="text" v-model="terminalno" required
-                       class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
-              </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="space-y-4">
+            <FormField label="Terminal No." v-model="terminalno" required />
+            <FormField label="Full Name" v-model="name" required />
+            <FormField label="Email" v-model="email" type="email" required />
+          </div>
 
-              <div class="space-y-2">
-                <label for="name" class="block text-sm font-medium text-gray-700">Full Name:</label>
-                <input type="text" v-model="name" required
-                       class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
-              </div>
-
-              <div class="space-y-2">
-                <label for="email" class="block text-sm font-medium text-gray-700">Email:</label>
-                <input type="email" v-model="email" required
-                       class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
-              </div>
+          <div class="space-y-4">
+            <FormField label="Student No" v-model="studentnumber" required />
+            <div class="space-y-2">
+              <label class="block text-sm font-medium text-gray-700">Year and Section</label>
+              <select v-model="selectedSection" required
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="" disabled>Select Section</option>
+                <option v-for="section in sections" :key="section.id" :value="section.id">
+                  {{ section.name }}
+                </option>
+              </select>
             </div>
 
-            <div class="space-y-4">
-              <div class="space-y-2">
-                <label for="studentnumber" class="block text-sm font-medium text-gray-700">Student No:</label>
-                <input type="text" v-model="studentnumber" required
-                       class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
-              </div>
-
-              <div class="space-y-2">
-                <label for="yearsection" class="block text-sm font-medium text-gray-700">Year and Section:</label>
-                <input type="text" v-model="yearsection" required
-                       class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
-              </div>
-
-              <div class="space-y-2">
-                <label for="number" class="block text-sm font-medium text-gray-700">Number:</label>
-                <input type="text" v-model="number"
-                       class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
-              </div>
+            <div class="grid grid-cols-2 gap-4">
+              <FormField label="Building" v-model="building" readonly />
+              <FormField label="Classroom" v-model="classroom" readonly />
             </div>
           </div>
         </div>
@@ -257,52 +220,25 @@ const handleSubmit = async () => {
         <div class="space-y-4">
           <h3 class="text-lg font-semibold text-gray-800">Condition:</h3>
           <p class="text-sm text-gray-600">
-            Check if working properly, otherwise don't check and state the reason in the remarks.
+            Check if working properly, otherwise state the reason in remarks.
           </p>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="space-y-3">
-              <div class="flex flex-wrap gap-4">
-                <label class="flex items-center space-x-2">
-                  <input type="checkbox" v-model="components" value="system_unit"
-                         class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                  <span class="text-sm text-gray-700">System Unit</span>
-                </label>
-                <label class="flex items-center space-x-2">
-                  <input type="checkbox" v-model="components" value="monitor"
-                         class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                  <span class="text-sm text-gray-700">Monitor</span>
-                </label>
-                <label class="flex items-center space-x-2">
-                  <input type="checkbox" v-model="components" value="keyboard"
-                         class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                  <span class="text-sm text-gray-700">Keyboard</span>
-                </label>
-                <label class="flex items-center space-x-2">
-                  <input type="checkbox" v-model="components" value="mouse"
-                         class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                  <span class="text-sm text-gray-700">Mouse</span>
-                </label>
-                <label class="flex items-center space-x-2">
-                  <input type="checkbox" v-model="components" value="network"
-                         class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                  <span class="text-sm text-gray-700">Network</span>
-                </label>
-              </div>
-            </div>
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+            <ComponentCheckbox v-for="component in [ 'System Unit', 'Monitor', 'Keyboard', 'Mouse', 'Network' ]"
+              :key="component" :label="component" v-model="components" :value="component.toLowerCase()" />
+          </div>
 
-            <div class="space-y-2">
-              <label for="remarks" class="block text-sm font-medium text-gray-700">Remarks:</label>
-              <input type="text" v-model="remarks"
-                     class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
-            </div>
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Remarks:</label>
+            <textarea v-model="remarks"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[80px]" />
           </div>
         </div>
 
         <!-- Submit Button -->
         <div class="flex justify-center pt-4">
           <button type="submit" :disabled="isSubmitting"
-                  class="px-6 py-2 bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed">
+            class="px-6 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
             {{ isSubmitting ? 'Submitting...' : 'Submit' }}
           </button>
         </div>

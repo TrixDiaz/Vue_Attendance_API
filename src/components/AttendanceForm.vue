@@ -1,8 +1,5 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue';
-import AlertMessage from './AlertMessage.vue';
-import FormField from './FormField.vue';
-import ComponentCheckbox from './Checkbox.vue';
+import { ref, onMounted, watch } from 'vue'
 
 // Form data refs
 const date = ref('')
@@ -17,7 +14,6 @@ const name = ref('')
 const email = ref('')
 const studentnumber = ref('')
 const yearsection = ref('')
-const number = ref('')
 const components = ref([])
 const remarks = ref('')
 const sections = ref([])
@@ -43,11 +39,12 @@ const updateDateTime = () => {
 // Fetch sections from the backend
 const fetchSections = async () => {
   try {
-    const response = await fetch('http://localhost:8000/api/sections')
+    const response = await fetch('http://10.10.0.3:3001/api/sections')
     if (!response.ok) throw new Error('Failed to fetch sections')
     sections.value = await response.json()
   } catch (error) {
     console.error('Error fetching sections:', error)
+    submitError.value = 'Failed to fetch sections'
   }
 }
 
@@ -55,22 +52,22 @@ const fetchSections = async () => {
 watch(selectedSection, async (newSection) => {
   if (newSection) {
     try {
-      const response = await fetch(`http://localhost:8000/api/sections/${newSection}`)
-      if (!response.ok) throw new Error('Failed to fetch building and classroom')
+      const response = await fetch(`http://10.10.0.3:3001/api/sections/${newSection}`)
+      if (!response.ok) throw new Error('Failed to fetch section details')
       const data = await response.json()
-      building.value = data.building
-      classroom.value = data.classroom
+      building.value = data.classroom?.building?.name || ''
+      classroom.value = data.classroom?.name || ''
+      yearsection.value = data.name || ''
     } catch (error) {
-      console.error('Error fetching building and classroom:', error)
+      console.error('Error fetching section details:', error)
+      submitError.value = 'Failed to fetch section details'
     }
   }
 })
 
-// Initialize date and time on component mount
 onMounted(() => {
   fetchSections()
   updateDateTime()
-  // Update time every minute
   setInterval(updateDateTime, 60000)
 })
 
@@ -80,71 +77,37 @@ const handleSubmit = async () => {
     submitError.value = ''
     submitSuccess.value = false
 
-    // Validate required fields
-    const requiredFields = {
-      subject: subject.value,
-      professorname: professorname.value,
-      building: building.value,
-      classroom: classroom.value,
-      terminalno: terminalno.value,
-      name: name.value,
-      email: email.value,
-      studentnumber: studentnumber.value,
-      yearsection: yearsection.value
-    }
-
-    // Check for empty required fields
-    const emptyFields = Object.entries(requiredFields)
-      .filter(([_, value]) => !value.trim())
-      .map(([key]) => key)
-
-    if (emptyFields.length > 0) {
-      throw new Error(`Please fill in all required fields: ${emptyFields.join(', ')}`)
-    }
-
-    // Create form data object
     const formData = {
-      subject: subject.value,
-      professorname: professorname.value,
-      building: building.value,
-      classroom: classroom.value,
-      terminalno: terminalno.value,
-      name: name.value,
-      email: email.value,
-      studentnumber: studentnumber.value,
-      yearsection: yearsection.value,
-      number: number.value,
-      components: components.value,
+      professor_id: 1, // Replace with actual professor ID
+      section_id: selectedSection.value,
+      terminal_code: terminalno.value,
+      student_full_name: name.value,
+      student_email: email.value,
+      student_number: parseInt(studentnumber.value),
+      year_section: yearsection.value,
       remarks: remarks.value
     }
 
-    const response = await fetch('https://qcu-rest-api-attendance.vercel.app/api/create', {
+    const response = await fetch('http://10.10.0.3:3001/api/store/attendance', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
       },
+      credentials: 'include',
       body: JSON.stringify(formData)
     })
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => null)
-      throw new Error(errorData?.message || `Server error: ${response.status}`)
+      const errorData = await response.json()
+      throw new Error(errorData.message || `Server error: ${response.status}`)
     }
 
-    const data = await response.json()
-    console.log('Success:', data)
     submitSuccess.value = true
-
-    // Reset form
     resetForm()
-
   } catch (error) {
     console.error('Error:', error)
-    submitError.value = error.message || 'Failed to submit form. Please try again.'
+    submitError.value = error.message || 'Failed to submit form'
   } finally {
     isSubmitting.value = false
   }
@@ -160,9 +123,9 @@ const resetForm = () => {
   email.value = ''
   studentnumber.value = ''
   yearsection.value = ''
-  number.value = ''
   components.value = []
   remarks.value = ''
+  selectedSection.value = ''
 }
 </script>
 
@@ -170,51 +133,78 @@ const resetForm = () => {
   <div class="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
     <div class="mx-auto max-w-4xl bg-white rounded-lg shadow-md p-4 md:p-6">
       <h1 class="text-2xl md:text-3xl font-bold text-gray-800 mb-6 text-center">
-        Utilization Monitoring Form
+        QCU Utilization Monitoring Form
       </h1>
 
-      <AlertMessage v-if="submitSuccess" type="success" message="Form submitted successfully!" />
+      <!-- Alert Messages -->
+      <div v-if="submitSuccess" class="mb-4 p-4 rounded-lg bg-green-50 text-green-700 flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd"
+            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+            clip-rule="evenodd" />
+        </svg>
+        <span>Form submitted successfully!</span>
+      </div>
 
-      <AlertMessage v-if="submitError" type="error" :message="submitError" />
+      <div v-if="submitError" class="mb-4 p-4 rounded-lg bg-red-50 text-red-700 flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd"
+            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+            clip-rule="evenodd" />
+        </svg>
+        <span>{{ submitError }}</span>
+      </div>
 
       <form @submit.prevent="handleSubmit" class="space-y-6">
-        <!-- First Section -->
+        <!-- Section Selection -->
+        <div class="space-y-2">
+          <label class="block text-sm font-medium text-gray-700">Section</label>
+          <select v-model="selectedSection" required
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <option value="" disabled>Select Section</option>
+            <option v-for="section in sections" :key="section.id" :value="section.id">
+              {{ section.name }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Location Information -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField label="Name of Faculty" v-model="professorname" required />
-          <FormField label="Subject/Code" v-model="subject" required />
-        </div>
-
-        <hr class="border-gray-200" />
-
-        <!-- Second Section -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div class="space-y-4">
-            <FormField label="Terminal No." v-model="terminalno" required />
-            <FormField label="Full Name" v-model="name" required />
-            <FormField label="Email" v-model="email" type="email" required />
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Building</label>
+            <input type="text" v-model="building" readonly
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50">
           </div>
-
-          <div class="space-y-4">
-            <FormField label="Student No" v-model="studentnumber" required />
-            <div class="space-y-2">
-              <label class="block text-sm font-medium text-gray-700">Year and Section</label>
-              <select v-model="selectedSection" required
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                <option value="" disabled>Select Section</option>
-                <option v-for="section in sections" :key="section.id" :value="section.id">
-                  {{ section.name }}
-                </option>
-              </select>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-              <FormField label="Building" v-model="building" readonly />
-              <FormField label="Classroom" v-model="classroom" readonly />
-            </div>
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Classroom</label>
+            <input type="text" v-model="classroom" readonly
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50">
           </div>
         </div>
 
-        <hr class="border-gray-200" />
+        <!-- Student Information -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Terminal No.</label>
+            <input type="text" v-model="terminalno" required
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+          </div>
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Full Name</label>
+            <input type="text" v-model="name" required
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+          </div>
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Email</label>
+            <input type="email" v-model="email" required
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+          </div>
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Student No</label>
+            <input type="text" v-model="studentnumber" required
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+          </div>
+        </div>
 
         <!-- Components Section -->
         <div class="space-y-4">
@@ -224,8 +214,12 @@ const resetForm = () => {
           </p>
 
           <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-            <ComponentCheckbox v-for="component in [ 'System Unit', 'Monitor', 'Keyboard', 'Mouse', 'Network' ]"
-              :key="component" :label="component" v-model="components" :value="component.toLowerCase()" />
+            <label v-for="component in [ 'System Unit', 'Monitor', 'Keyboard', 'Mouse', 'Network' ]" :key="component"
+              class="flex items-center space-x-2 cursor-pointer">
+              <input type="checkbox" :value="component.toLowerCase()" v-model="components"
+                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+              <span class="text-sm text-gray-700">{{ component }}</span>
+            </label>
           </div>
 
           <div class="space-y-2">

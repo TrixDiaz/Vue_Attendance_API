@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 
 // Form data refs
 const date = ref('')
@@ -18,6 +18,20 @@ const components = ref([])
 const remarks = ref('')
 const sections = ref([])
 const selectedSection = ref('')
+const isUsingComputer = ref(false) // New ref to track if user is using computer
+
+// Define available components
+const availableComponents = ['system unit', 'monitor', 'keyboard', 'mouse', 'network']
+
+// Computed property for the "Select All" checkbox state
+const allComponentsSelected = computed({
+  get: () => {
+    return availableComponents.length > 0 && components.value.length === availableComponents.length
+  },
+  set: (value) => {
+    components.value = value ? [...availableComponents] : []
+  }
+})
 
 // Form state
 const isSubmitting = ref(false)
@@ -80,7 +94,7 @@ const handleSubmit = async () => {
     const formData = {
       professor_id: 1, // Replace with actual professor ID
       section_id: selectedSection.value,
-      terminal_code: terminalno.value,
+      terminal_code: isUsingComputer.value ? terminalno.value : null, // Only include terminal if using computer
       student_full_name: name.value,
       student_email: email.value,
       student_number: parseInt(studentnumber.value),
@@ -126,6 +140,7 @@ const resetForm = () => {
   components.value = []
   remarks.value = ''
   selectedSection.value = ''
+  isUsingComputer.value = false
 }
 </script>
 
@@ -182,51 +197,73 @@ const resetForm = () => {
           </div>
         </div>
 
+        <!-- Using Computer Checkbox -->
+        <div class="space-y-2">
+          <label class="flex items-center space-x-2 cursor-pointer">
+            <input type="checkbox" v-model="isUsingComputer"
+              class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+            <span class="text-sm font-medium text-gray-700">I am using a computer</span>
+          </label>
+        </div>
+
         <!-- Student Information -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="space-y-2">
+          <div v-if="isUsingComputer" class="space-y-2 md:col-span-1">
             <label class="block text-sm font-medium text-gray-700">Terminal No.</label>
             <input type="text" v-model="terminalno" required
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
           </div>
-          <div class="space-y-2">
+          
+          <div class="space-y-2 md:col-span-1">
             <label class="block text-sm font-medium text-gray-700">Full Name</label>
             <input type="text" v-model="name" required
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
           </div>
-          <div class="space-y-2">
+          
+          <div class="space-y-2 md:col-span-1">
             <label class="block text-sm font-medium text-gray-700">Email</label>
             <input type="email" v-model="email" required
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
           </div>
-          <div class="space-y-2">
+          
+          <div class="space-y-2 md:col-span-1">
             <label class="block text-sm font-medium text-gray-700">Student No</label>
             <input type="text" v-model="studentnumber" required
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
           </div>
         </div>
 
-        <!-- Components Section -->
-        <div class="space-y-4">
+        <!-- Components Section - Only visible when using computer -->
+        <div v-if="isUsingComputer" class="space-y-4">
           <h3 class="text-lg font-semibold text-gray-800">Condition:</h3>
           <p class="text-sm text-gray-600">
             Check if working properly, otherwise state the reason in remarks.
           </p>
 
-          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-            <label v-for="component in [ 'System Unit', 'Monitor', 'Keyboard', 'Mouse', 'Network' ]" :key="component"
-              class="flex items-center space-x-2 cursor-pointer">
-              <input type="checkbox" :value="component.toLowerCase()" v-model="components"
+          <!-- Select All Checkbox -->
+          <div class="flex items-center mb-2">
+            <label class="flex items-center space-x-2 cursor-pointer">
+              <input type="checkbox" v-model="allComponentsSelected"
                 class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-              <span class="text-sm text-gray-700">{{ component }}</span>
+              <span class="text-sm font-medium text-gray-700">Select All</span>
             </label>
           </div>
 
-          <div class="space-y-2">
-            <label class="block text-sm font-medium text-gray-700">Remarks:</label>
-            <textarea v-model="remarks"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[80px]" />
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+            <label v-for="component in availableComponents" :key="component"
+              class="flex items-center space-x-2 cursor-pointer">
+              <input type="checkbox" :value="component" v-model="components"
+                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+              <span class="text-sm text-gray-700">{{ component.charAt(0).toUpperCase() + component.slice(1) }}</span>
+            </label>
           </div>
+        </div>
+
+        <!-- Remarks Field -->
+        <div class="space-y-2">
+          <label class="block text-sm font-medium text-gray-700">Remarks:</label>
+          <textarea v-model="remarks"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[80px]" />
         </div>
 
         <!-- Submit Button -->

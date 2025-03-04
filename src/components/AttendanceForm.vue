@@ -9,29 +9,14 @@ const subject = ref('')
 const professorname = ref('')
 const building = ref('')
 const classroom = ref('')
-const terminalno = ref('')
 const name = ref('')
 const email = ref('')
 const studentnumber = ref('')
 const yearsection = ref('')
-const components = ref([])
-const remarks = ref('')
+const remarks = ref('attendance') // Set static value for remarks
+const terminalno = ref('0') // Default terminal code to avoid null constraint
 const sections = ref([])
 const selectedSection = ref('')
-const isUsingComputer = ref(false) // New ref to track if user is using computer
-
-// Define available components
-const availableComponents = ['system unit', 'monitor', 'keyboard', 'mouse', 'network']
-
-// Computed property for the "Select All" checkbox state
-const allComponentsSelected = computed({
-  get: () => {
-    return availableComponents.length > 0 && components.value.length === availableComponents.length
-  },
-  set: (value) => {
-    components.value = value ? [...availableComponents] : []
-  }
-})
 
 // Form state
 const isSubmitting = ref(false)
@@ -46,14 +31,15 @@ const updateDateTime = () => {
   time.value = now.toLocaleTimeString('en-US', {
     hour12: false,
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    second: '2-digit'
   })
 }
 
 // Fetch sections from the backend
 const fetchSections = async () => {
   try {
-    const response = await fetch('http://10.10.0.3:3001/api/sections')
+    const response = await fetch('https://qcu-lab-resource.cloud/api/sections')
     if (!response.ok) throw new Error('Failed to fetch sections')
     sections.value = await response.json()
   } catch (error) {
@@ -66,7 +52,7 @@ const fetchSections = async () => {
 watch(selectedSection, async (newSection) => {
   if (newSection) {
     try {
-      const response = await fetch(`http://10.10.0.3:3001/api/sections/${newSection}`)
+      const response = await fetch(`https://qcu-lab-resource.cloud/api/sections/${newSection}`)
       if (!response.ok) throw new Error('Failed to fetch section details')
       const data = await response.json()
       building.value = data.classroom?.building?.name || ''
@@ -82,7 +68,7 @@ watch(selectedSection, async (newSection) => {
 onMounted(() => {
   fetchSections()
   updateDateTime()
-  setInterval(updateDateTime, 60000)
+  setInterval(updateDateTime, 1000)
 })
 
 const handleSubmit = async () => {
@@ -94,15 +80,15 @@ const handleSubmit = async () => {
     const formData = {
       professor_id: 1, // Replace with actual professor ID
       section_id: selectedSection.value,
-      terminal_code: isUsingComputer.value ? terminalno.value : null, // Only include terminal if using computer
+      terminal_code: terminalno.value, // Use default value instead of null
       student_full_name: name.value,
       student_email: email.value,
       student_number: parseInt(studentnumber.value),
       year_section: yearsection.value,
-      remarks: remarks.value
+      remarks: remarks.value // This will always be "attendance"
     }
 
-    const response = await fetch('http://10.10.0.3:3001/api/store/attendance', {
+    const response = await fetch('https://qcu-lab-resource.cloud/api/store/attendance', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -132,15 +118,13 @@ const resetForm = () => {
   professorname.value = ''
   building.value = ''
   classroom.value = ''
-  terminalno.value = ''
   name.value = ''
   email.value = ''
   studentnumber.value = ''
   yearsection.value = ''
-  components.value = []
-  remarks.value = ''
+  remarks.value = 'attendance' // Reset to the static value
+  terminalno.value = '0' // Reset to default value
   selectedSection.value = ''
-  isUsingComputer.value = false
 }
 </script>
 
@@ -171,6 +155,14 @@ const resetForm = () => {
       </div>
 
       <form @submit.prevent="handleSubmit" class="space-y-6">
+        <!-- Realtime Date and Time -->
+        <div class="space-y-2">
+          <label class="block text-sm font-medium text-gray-700">Current Date & Time</label>
+          <div class="px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-800">
+            {{ day }}, {{ date }} - {{ time }}
+          </div>
+        </div>
+
         <!-- Section Selection -->
         <div class="space-y-2">
           <label class="block text-sm font-medium text-gray-700">Section</label>
@@ -197,35 +189,20 @@ const resetForm = () => {
           </div>
         </div>
 
-        <!-- Using Computer Checkbox -->
-        <div class="space-y-2">
-          <label class="flex items-center space-x-2 cursor-pointer">
-            <input type="checkbox" v-model="isUsingComputer"
-              class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-            <span class="text-sm font-medium text-gray-700">I am using a computer</span>
-          </label>
-        </div>
-
         <!-- Student Information -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div v-if="isUsingComputer" class="space-y-2 md:col-span-1">
-            <label class="block text-sm font-medium text-gray-700">Terminal No.</label>
-            <input type="text" v-model="terminalno" required
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-          </div>
-          
           <div class="space-y-2 md:col-span-1">
             <label class="block text-sm font-medium text-gray-700">Full Name</label>
             <input type="text" v-model="name" required
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
           </div>
-          
+
           <div class="space-y-2 md:col-span-1">
             <label class="block text-sm font-medium text-gray-700">Email</label>
             <input type="email" v-model="email" required
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
           </div>
-          
+
           <div class="space-y-2 md:col-span-1">
             <label class="block text-sm font-medium text-gray-700">Student No</label>
             <input type="text" v-model="studentnumber" required
@@ -233,38 +210,9 @@ const resetForm = () => {
           </div>
         </div>
 
-        <!-- Components Section - Only visible when using computer -->
-        <div v-if="isUsingComputer" class="space-y-4">
-          <h3 class="text-lg font-semibold text-gray-800">Condition:</h3>
-          <p class="text-sm text-gray-600">
-            Check if working properly, otherwise state the reason in remarks.
-          </p>
-
-          <!-- Select All Checkbox -->
-          <div class="flex items-center mb-2">
-            <label class="flex items-center space-x-2 cursor-pointer">
-              <input type="checkbox" v-model="allComponentsSelected"
-                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-              <span class="text-sm font-medium text-gray-700">Select All</span>
-            </label>
-          </div>
-
-          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-            <label v-for="component in availableComponents" :key="component"
-              class="flex items-center space-x-2 cursor-pointer">
-              <input type="checkbox" :value="component" v-model="components"
-                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-              <span class="text-sm text-gray-700">{{ component.charAt(0).toUpperCase() + component.slice(1) }}</span>
-            </label>
-          </div>
-        </div>
-
-        <!-- Remarks Field -->
-        <div class="space-y-2">
-          <label class="block text-sm font-medium text-gray-700">Remarks:</label>
-          <textarea v-model="remarks"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[80px]" />
-        </div>
+        <!-- Hidden fields -->
+        <input type="hidden" v-model="remarks">
+        <input type="hidden" v-model="terminalno">
 
         <!-- Submit Button -->
         <div class="flex justify-center pt-4">

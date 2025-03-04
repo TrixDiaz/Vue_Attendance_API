@@ -46,14 +46,15 @@ const updateDateTime = () => {
   time.value = now.toLocaleTimeString('en-US', {
     hour12: false,
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    second: '2-digit'
   })
 }
 
 // Fetch sections from the backend
 const fetchSections = async () => {
   try {
-    const response = await fetch('http://10.10.0.3:3001/api/sections')
+    const response = await fetch('https://qcu-lab-resource.cloud/api/sections')
     if (!response.ok) throw new Error('Failed to fetch sections')
     sections.value = await response.json()
   } catch (error) {
@@ -66,7 +67,7 @@ const fetchSections = async () => {
 watch(selectedSection, async (newSection) => {
   if (newSection) {
     try {
-      const response = await fetch(`http://10.10.0.3:3001/api/sections/${newSection}`)
+      const response = await fetch(`https://qcu-lab-resource.cloud/api/sections/${newSection}`)
       if (!response.ok) throw new Error('Failed to fetch section details')
       const data = await response.json()
       building.value = data.classroom?.building?.name || ''
@@ -82,7 +83,7 @@ watch(selectedSection, async (newSection) => {
 onMounted(() => {
   fetchSections()
   updateDateTime()
-  setInterval(updateDateTime, 60000)
+  setInterval(updateDateTime, 1000)
 })
 
 const handleSubmit = async () => {
@@ -102,7 +103,7 @@ const handleSubmit = async () => {
       remarks: remarks.value
     }
 
-    const response = await fetch('http://10.10.0.3:3001/api/store/attendance', {
+    const response = await fetch('https://qcu-lab-resource.cloud/api/store/attendance', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -145,6 +146,7 @@ const resetForm = () => {
 </script>
 
 <template>
+
   <div class="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
     <div class="mx-auto max-w-4xl bg-white rounded-lg shadow-md p-4 md:p-6">
       <h1 class="text-2xl md:text-3xl font-bold text-gray-800 mb-6 text-center">
@@ -171,6 +173,14 @@ const resetForm = () => {
       </div>
 
       <form @submit.prevent="handleSubmit" class="space-y-6">
+        <!-- Realtime Date and Time -->
+        <div class="space-y-2">
+          <label class="block text-sm font-medium text-gray-700">Current Date & Time</label>
+          <div class="px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-800">
+            {{ day }}, {{ date }} - {{ time }}
+          </div>
+        </div>
+
         <!-- Section Selection -->
         <div class="space-y-2">
           <label class="block text-sm font-medium text-gray-700">Section</label>
@@ -210,22 +220,22 @@ const resetForm = () => {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div v-if="isUsingComputer" class="space-y-2 md:col-span-1">
             <label class="block text-sm font-medium text-gray-700">Terminal No.</label>
-            <input type="text" v-model="terminalno" required
+            <input type="text" v-model="terminalno" required placeholder="Enter Number Only"
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
           </div>
-          
+
           <div class="space-y-2 md:col-span-1">
             <label class="block text-sm font-medium text-gray-700">Full Name</label>
             <input type="text" v-model="name" required
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
           </div>
-          
+
           <div class="space-y-2 md:col-span-1">
             <label class="block text-sm font-medium text-gray-700">Email</label>
             <input type="email" v-model="email" required
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
           </div>
-          
+
           <div class="space-y-2 md:col-span-1">
             <label class="block text-sm font-medium text-gray-700">Student No</label>
             <input type="text" v-model="studentnumber" required
@@ -262,7 +272,7 @@ const resetForm = () => {
         <!-- Remarks Field -->
         <div class="space-y-2">
           <label class="block text-sm font-medium text-gray-700">Remarks:</label>
-          <textarea v-model="remarks"
+          <textarea v-model="remarks" required
             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[80px]" />
         </div>
 

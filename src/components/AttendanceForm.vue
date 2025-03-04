@@ -9,29 +9,14 @@ const subject = ref('')
 const professorname = ref('')
 const building = ref('')
 const classroom = ref('')
-const terminalno = ref('')
 const name = ref('')
 const email = ref('')
 const studentnumber = ref('')
 const yearsection = ref('')
-const components = ref([])
-const remarks = ref('')
+const remarks = ref('attendance') // Set static value for remarks
+const terminalno = ref('0') // Default terminal code to avoid null constraint
 const sections = ref([])
 const selectedSection = ref('')
-const isUsingComputer = ref(false) // New ref to track if user is using computer
-
-// Define available components
-const availableComponents = ['system unit', 'monitor', 'keyboard', 'mouse', 'network']
-
-// Computed property for the "Select All" checkbox state
-const allComponentsSelected = computed({
-  get: () => {
-    return availableComponents.length > 0 && components.value.length === availableComponents.length
-  },
-  set: (value) => {
-    components.value = value ? [...availableComponents] : []
-  }
-})
 
 // Form state
 const isSubmitting = ref(false)
@@ -95,12 +80,12 @@ const handleSubmit = async () => {
     const formData = {
       professor_id: 1, // Replace with actual professor ID
       section_id: selectedSection.value,
-      terminal_code: isUsingComputer.value ? terminalno.value : null, // Only include terminal if using computer
+      terminal_code: terminalno.value, // Use default value instead of null
       student_full_name: name.value,
       student_email: email.value,
       student_number: parseInt(studentnumber.value),
       year_section: yearsection.value,
-      remarks: remarks.value
+      remarks: remarks.value // This will always be "attendance"
     }
 
     const response = await fetch('https://qcu-lab-resource.cloud/api/store/attendance', {
@@ -133,20 +118,17 @@ const resetForm = () => {
   professorname.value = ''
   building.value = ''
   classroom.value = ''
-  terminalno.value = ''
   name.value = ''
   email.value = ''
   studentnumber.value = ''
   yearsection.value = ''
-  components.value = []
-  remarks.value = ''
+  remarks.value = 'attendance' // Reset to the static value
+  terminalno.value = '0' // Reset to default value
   selectedSection.value = ''
-  isUsingComputer.value = false
 }
 </script>
 
 <template>
-
   <div class="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
     <div class="mx-auto max-w-4xl bg-white rounded-lg shadow-md p-4 md:p-6">
       <h1 class="text-2xl md:text-3xl font-bold text-gray-800 mb-6 text-center">
@@ -207,23 +189,8 @@ const resetForm = () => {
           </div>
         </div>
 
-        <!-- Using Computer Checkbox -->
-        <div class="space-y-2">
-          <label class="flex items-center space-x-2 cursor-pointer">
-            <input type="checkbox" v-model="isUsingComputer"
-              class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-            <span class="text-sm font-medium text-gray-700">I am using a computer</span>
-          </label>
-        </div>
-
         <!-- Student Information -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div v-if="isUsingComputer" class="space-y-2 md:col-span-1">
-            <label class="block text-sm font-medium text-gray-700">Terminal No.</label>
-            <input type="text" v-model="terminalno" required placeholder="Enter Number Only"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-          </div>
-
           <div class="space-y-2 md:col-span-1">
             <label class="block text-sm font-medium text-gray-700">Full Name</label>
             <input type="text" v-model="name" required
@@ -243,38 +210,9 @@ const resetForm = () => {
           </div>
         </div>
 
-        <!-- Components Section - Only visible when using computer -->
-        <div v-if="isUsingComputer" class="space-y-4">
-          <h3 class="text-lg font-semibold text-gray-800">Condition:</h3>
-          <p class="text-sm text-gray-600">
-            Check if working properly, otherwise state the reason in remarks.
-          </p>
-
-          <!-- Select All Checkbox -->
-          <div class="flex items-center mb-2">
-            <label class="flex items-center space-x-2 cursor-pointer">
-              <input type="checkbox" v-model="allComponentsSelected"
-                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-              <span class="text-sm font-medium text-gray-700">Select All</span>
-            </label>
-          </div>
-
-          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-            <label v-for="component in availableComponents" :key="component"
-              class="flex items-center space-x-2 cursor-pointer">
-              <input type="checkbox" :value="component" v-model="components"
-                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-              <span class="text-sm text-gray-700">{{ component.charAt(0).toUpperCase() + component.slice(1) }}</span>
-            </label>
-          </div>
-        </div>
-
-        <!-- Remarks Field -->
-        <div class="space-y-2">
-          <label class="block text-sm font-medium text-gray-700">Remarks:</label>
-          <textarea v-model="remarks" required
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[80px]" />
-        </div>
+        <!-- Hidden fields -->
+        <input type="hidden" v-model="remarks">
+        <input type="hidden" v-model="terminalno">
 
         <!-- Submit Button -->
         <div class="flex justify-center pt-4">

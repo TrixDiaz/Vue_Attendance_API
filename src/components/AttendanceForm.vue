@@ -6,22 +6,35 @@ const date = ref('')
 const day = ref('')
 const time = ref('')
 const subject = ref('')
-const professorname = ref('')
+const subjects = ref([])
+const professor = ref('')
 const building = ref('')
 const classroom = ref('')
 const name = ref('')
 const email = ref('')
 const studentnumber = ref('')
 const yearsection = ref('')
-const remarks = ref('attendance') // Set static value for remarks
-const terminalno = ref('0') // Default terminal code to avoid null constraint
-const sections = ref([])
-const selectedSection = ref('')
+const remarks = ref('attendance')
+const terminalno = ref('0')
 
 // Form state
 const isSubmitting = ref(false)
 const submitError = ref('')
 const submitSuccess = ref(false)
+
+// Validate student number format
+const validateStudentNumber = (studentNum) => {
+  // Regular expression to match the format: two digits, dash, four digits
+  const studentNumberRegex = /^\d{2}-\d{4}$/
+  return studentNumberRegex.test(studentNum)
+}
+
+// Email validation function
+const validateEmail = (email) => {
+  // Comprehensive email validation regex
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
+  return emailRegex.test(email)
+}
 
 // Update date and time
 const updateDateTime = () => {
@@ -36,37 +49,51 @@ const updateDateTime = () => {
   })
 }
 
-// Fetch sections from the backend
-const fetchSections = async () => {
+// Fetch subjects from the backend
+const fetchSubjects = async () => {
   try {
-    const response = await fetch('https://qcu-lab-resource.cloud/api/sections')
-    if (!response.ok) throw new Error('Failed to fetch sections')
-    sections.value = await response.json()
+    const response = await fetch('http://localhost:8000/api/subjects')
+    if (!response.ok) throw new Error('Failed to fetch subjects')
+    subjects.value = await response.json()
   } catch (error) {
-    console.error('Error fetching sections:', error)
-    submitError.value = 'Failed to fetch sections'
+    console.error('Error fetching subjects:', error)
+    submitError.value = 'Failed to fetch subjects'
   }
 }
 
-// Watch for changes in selectedSection to update building and classroom
-watch(selectedSection, async (newSection) => {
-  if (newSection) {
+// Watch for changes in subject to populate details
+watch(subject, async (newSubject) => {
+  if (newSubject) {
     try {
-      const response = await fetch(`https://qcu-lab-resource.cloud/api/sections/${newSection}`)
-      if (!response.ok) throw new Error('Failed to fetch section details')
-      const data = await response.json()
-      building.value = data.classroom?.building?.name || ''
-      classroom.value = data.classroom?.name || ''
-      yearsection.value = data.name || ''
+      // Find the selected subject in the subjects array
+      const selectedSubjectData = subjects.value.find(s => s.id === newSubject)
+      
+      if (selectedSubjectData) {
+        // Populate section details
+        yearsection.value = selectedSubjectData.section?.name || ''
+        
+        // Populate professor details
+        professor.value = selectedSubjectData.professor?.name || ''
+        
+        // Populate classroom and building details
+        building.value = selectedSubjectData.section?.classroom?.building?.name || ''
+        classroom.value = selectedSubjectData.section?.classroom?.name || ''
+      } else {
+        // Reset fields if no matching subject found
+        professor.value = ''
+        building.value = ''
+        classroom.value = ''
+        yearsection.value = ''
+      }
     } catch (error) {
-      console.error('Error fetching section details:', error)
-      submitError.value = 'Failed to fetch section details'
+      console.error('Error fetching subject details:', error)
+      submitError.value = 'Failed to fetch subject details'
     }
   }
 })
 
 onMounted(() => {
-  fetchSections()
+  fetchSubjects()
   updateDateTime()
   setInterval(updateDateTime, 1000)
 })
@@ -77,18 +104,26 @@ const handleSubmit = async () => {
     submitError.value = ''
     submitSuccess.value = false
 
-    const formData = {
-      professor_id: 1, // Replace with actual professor ID
-      section_id: selectedSection.value,
-      terminal_code: terminalno.value, // Use default value instead of null
-      student_full_name: name.value,
-      student_email: email.value,
-      student_number: parseInt(studentnumber.value),
-      year_section: yearsection.value,
-      remarks: remarks.value // This will always be "attendance"
+    // Validate student number format
+    if (!validateStudentNumber(studentnumber.value)) {
+      throw new Error('Student number must be in the format XX-XXXX (e.g., 21-1558)')
     }
 
-    const response = await fetch('https://qcu-lab-resource.cloud/api/store/attendance', {
+    // Validate email if provided
+    if (email.value && !validateEmail(email.value)) {
+      throw new Error('Please enter a valid email address')
+    }
+
+    const formData = {
+      subject_id: subject.value,
+      terminal_number: terminalno.value,
+      student_full_name: name.value,
+      student_number: studentnumber.value,
+      student_email: email.value || null,
+      remarks: remarks.value
+    }
+
+    const response = await fetch('http://localhost:8000/api/store/attendance', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -99,15 +134,15 @@ const handleSubmit = async () => {
     })
 
     if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.message || `Server error: ${response.status}`)
+      const errorData = await response.text()
+      throw new Error(errorData || `Server error: ${response.status}`)
     }
 
     submitSuccess.value = true
     resetForm()
   } catch (error) {
     console.error('Error:', error)
-    submitError.value = error.message || 'Failed to submit form'
+    submitError.value = error.message || 'Failed to record attendance'
   } finally {
     isSubmitting.value = false
   }
@@ -115,16 +150,15 @@ const handleSubmit = async () => {
 
 const resetForm = () => {
   subject.value = ''
-  professorname.value = ''
+  professor.value = ''
   building.value = ''
   classroom.value = ''
   name.value = ''
   email.value = ''
   studentnumber.value = ''
   yearsection.value = ''
-  remarks.value = 'attendance' // Reset to the static value
-  terminalno.value = '0' // Reset to default value
-  selectedSection.value = ''
+  remarks.value = 'attendance'
+  terminalno.value = '0'
 }
 </script>
 
@@ -142,7 +176,7 @@ const resetForm = () => {
             d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
             clip-rule="evenodd" />
         </svg>
-        <span>Form submitted successfully!</span>
+        <span>Attendance recorded successfully!</span>
       </div>
 
       <div v-if="submitError" class="mb-4 p-4 rounded-lg bg-red-50 text-red-700 flex items-center gap-2">
@@ -163,16 +197,30 @@ const resetForm = () => {
           </div>
         </div>
 
-        <!-- Section Selection -->
+        <!-- Subject Selection -->
         <div class="space-y-2">
-          <label class="block text-sm font-medium text-gray-700">Section</label>
-          <select v-model="selectedSection" required
+          <label class="block text-sm font-medium text-gray-700">Subject</label>
+          <select v-model="subject" required
             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-            <option value="" disabled>Select Section</option>
-            <option v-for="section in sections" :key="section.id" :value="section.id">
-              {{ section.name }}
+            <option value="" disabled>Select Subject</option>
+            <option v-for="subj in subjects" :key="subj.id" :value="subj.id">
+              {{ subj.subject_code }} - {{ subj.name }}
             </option>
           </select>
+        </div>
+
+        <!-- Readonly Fields for Context -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Year/Section</label>
+            <input type="text" v-model="yearsection" readonly
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50">
+          </div>
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Professor</label>
+            <input type="text" v-model="professor" readonly
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50">
+          </div>
         </div>
 
         <!-- Location Information -->
@@ -198,15 +246,30 @@ const resetForm = () => {
           </div>
 
           <div class="space-y-2 md:col-span-1">
-            <label class="block text-sm font-medium text-gray-700">Email</label>
-            <input type="email" v-model="email" required
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <label class="block text-sm font-medium text-gray-700">Email (Optional)</label>
+            <input 
+              type="email" 
+              v-model="email"
+              pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+              placeholder="username@gmail.com"
+              title="Please enter a valid email address"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+            <p class="text-xs text-gray-500 mt-1">Format: username@gmail.com</p>
           </div>
 
           <div class="space-y-2 md:col-span-1">
             <label class="block text-sm font-medium text-gray-700">Student No</label>
-            <input type="text" v-model="studentnumber" required
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <input 
+              type="text" 
+              v-model="studentnumber" 
+              required
+              pattern="\d{2}-\d{4}"
+              placeholder="21-0000"
+              title="Student number must be in the format XX-XXXX"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+            <p class="text-xs text-gray-500 mt-1">Format: XX-XXXX (e.g., 21-0000)</p>
           </div>
         </div>
 
@@ -216,7 +279,7 @@ const resetForm = () => {
 
         <!-- Submit Button -->
         <div class="flex justify-center pt-4">
-          <button type="submit" :disabled="isSubmitting"
+          <button type="submit" :disabled="isSubmitting || !subject"
             class="px-6 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
             {{ isSubmitting ? 'Submitting...' : 'Submit' }}
           </button>
